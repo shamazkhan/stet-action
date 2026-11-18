@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs `stet guard` and `stet check` in CI and writes a job summary. Inputs arrive as STET_* env vars.
+# Runs `stet guard`, `stet check` and (optionally) `stet pr lint` in CI and writes a job summary. Inputs arrive as STET_* env vars.
 set -uo pipefail
 STET="npx -y stet-cli@${STET_VERSION:-latest}"
 SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
@@ -47,9 +47,20 @@ if [ "${STET_CHECK:-true}" = "true" ]; then
   if [ $check_rc -ne 0 ]; then echo "::error title=Stet check::A locked behaviour is failing. Fix the change, not the check."; fi
 fi
 
-if [ $guard_rc -ne 0 ] && [ $check_rc -ne 0 ]; then result=failed
+format_rc=0
+if [ "${STET_PR_FORMAT:-false}" = "true" ] && [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -n "${GITHUB_BASE_REF:-}" ]; then
+  echo "::group::stet pr lint (PR description format)"
+  f_out="$(node -e "const e=require(process.env.GITHUB_EVENT_PATH);process.stdout.write((e.pull_request&&e.pull_request.body)||'')" | $STET pr lint - 2>&1)"; format_rc=$?
+  echo "$f_out"; echo "::endgroup::"
+  { echo "#### PR description format"; echo '```'; echo "$f_out"; echo '```'; } >> "$SUMMARY"
+  if [ $format_rc -ne 0 ]; then echo "::error title=Stet PR format::The PR description doesn't follow this repo's format. Regenerate it with: stet pr --what \"<why>\""; fi
+fi
+
+fails=0; [ $guard_rc -ne 0 ] && fails=$((fails+1)); [ $check_rc -ne 0 ] && fails=$((fails+1)); [ $format_rc -ne 0 ] && fails=$((fails+1))
+if [ $fails -gt 1 ]; then result=failed
 elif [ $guard_rc -ne 0 ]; then result=guard-failed
 elif [ $check_rc -ne 0 ]; then result=check-failed
+elif [ $format_rc -ne 0 ]; then result=format-failed
 else result=pass; fi
 echo "result=$result" >> "$OUTPUT"
 echo "" >> "$SUMMARY"; echo "<sub>[Stet](https://getstet.dev) · result: **$result**</sub>" >> "$SUMMARY"

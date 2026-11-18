@@ -46,6 +46,7 @@ On a pull request the comparison is against the merge base with the target branc
 | `guard` | `true` | Run `stet guard`. |
 | `check` | `true` | Run `stet check`. |
 | `warn-only` | `false` | Report guard violations as warnings instead of failing. |
+| `pr-format` | `false` | On pull requests, fail when the PR description doesn't follow the format from `stet pr` (missing sections, unwritten "What and why", removed footer). Needs stet-cli 0.7.0+. |
 | `only` | | Run only these locks, e.g. `L1,L3`. |
 | `base` | merge base | Commit or branch to compare against. |
 | `version` | `latest` | `stet-cli` version. |
